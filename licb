@@ -1,0 +1,342 @@
+#!/usr/bin/env python3
+
+# Lxd Image & Container Builder => licb
+#
+# Copyright (C) 2016
+#
+# This library is free software; you can redistribute it and/or
+# modify it under the terms of the GNU Library General Public
+# License as published by the Free Software Foundation; either
+# version 2 of the License, or (at your option) any later version.
+#
+# This library is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Library General Public License for more details.
+#
+# You should have received a copy of the GNU Library General Public
+# License along with this library; if not, write to the
+# Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+# Boston, MA  02110-1301, USA.
+
+import os
+import sys
+import argparse
+import subprocess
+import random
+import time
+import logging
+
+# Parse the command line parameters and options
+parser = argparse.ArgumentParser()
+parser.add_argument("file", help="file to process")
+parser.add_argument("-v", "--verbose", help="increase output verbosity", action="store_true")
+parser.add_argument("-d", "--debug", help="enable debug output", action="store_true")
+parser.add_argument("-V", "--version", action="version", version='VERSION 0.1')
+args = parser.parse_args()
+
+
+# Set logging settings - default is WARNING
+logLevel = logging.WARNING
+
+if args.verbose:
+    logLevel = logging.INFO
+
+if args.debug:
+    logLevel = logging.DEBUG
+
+logging.basicConfig(level=logLevel, format='%(levelname)s %(message)s')
+
+# Print command line args
+logging.debug("File argument: " + args.file)
+logging.debug("Verbose argument: " + str(args.verbose))
+logging.debug("Debug argument: " + str(args.debug))
+
+
+####################
+# Global variables #
+####################
+
+# Actual container and snapshot
+actualContainer = ""
+actualSnapshot = ""
+snapshotCounter = 0
+
+
+######################
+# LXD function calls #
+######################
+
+def lxd_image_copy(imageLocation, imageName):
+    """Calls the 'lxc image copy' function.
+    imageLocation must be ending with ':'"""
+    logging.debug("lxd image copy")
+
+    try:
+        print(subprocess.check_output(
+            ["lxc", "image", "copy", imageLocation + ":" + imageName, "local:", "--alias=" + imageName]
+            , universal_newlines=True))
+    except subprocess.CalledProcessError as err:
+        print(err.output)
+        print(err.cmd)
+        print(err.returncode)
+        print(err)
+
+
+def lxd_launch(imageName, containerName):
+    """Calls the 'lxc launch' function."""
+
+    # Set global actual container var
+    global actualContainer
+    actualContainer = containerName
+
+    try:
+        print(subprocess.check_output(
+            ["lxc", "launch", imageName, actualContainer]
+            , universal_newlines=True))
+    except subprocess.CalledProcessError as err:
+        print(err.output)
+        print(err.cmd)
+        print(err.returncode)
+        print(err)
+
+
+def lxd_exec(containerName, command):
+    """Calls the 'lxc exec --' function"""
+
+    try:
+        print(subprocess.check_output(
+            "lxc exec " + containerName + " -- " + command, universal_newlines=True, shell=True))
+    except subprocess.CalledProcessError as err:
+        print(err.output)
+        print(err.cmd)
+        print(err.returncode)
+        print(err)
+
+
+def lxd_start_container(containerName):
+    """Calls 'lxc start' to start a container"""
+    logging.debug("lxd start func")
+    print(subprocess.check_output(["lxc", "start", containerName], universal_newlines=True))
+
+
+def lxd_stop_container(containerName):
+    """Calls 'lxc stop' to stop a container"""
+    logging.debug("lxd stop func")
+    print(subprocess.check_output(["lxc", "stop", containerName], universal_newlines=True))
+
+
+def lxd_snapshot(containerName, snapshotName, stateful = False):
+    """Calls the 'lxc snapshot' function."""
+    try:
+        if stateful:
+            print(subprocess.check_output(["lxc", "snapshot", containerName, snapshotName, "--stateful"]
+                , universal_newlines=True))
+        else:
+            print(subprocess.check_output(["lxc", "snapshot", containerName, snapshotName]
+                , universal_newlines=True))
+    except subprocess.CalledProcessError as err:
+        print(err.output)
+        print(err.cmd)
+        print(err.returncode)
+        print(err)
+
+
+def lxd_publish_image(imageName, containerName, snapshotName = None):
+    """Calls the 'lxc publish' function."""
+    try:
+        if snapshotName is None:
+            print(subprocess.check_output(["lxc", "publish", containerName, "--alias=" + imageName]
+                , universal_newlines=True))
+        else:
+            print(subprocess.check_output(
+                ["lxc", "publish", containerName + "/" + snapshotName, "--alias=" + imageName]
+                , universal_newlines=True))
+    except subprocess.CalledProcessError as err:
+        print(err.output)
+        print(err.cmd)
+        print(err.returncode)
+        print(err)
+
+
+def lxd_file_push(containerName, source, destination):
+    """Calls the 'lxc file push' function."""
+    try:
+        print(subprocess.check_output(
+            ["lxc", "file", "push", "--uid=0", "--gid=0", source, containerName + destination]
+            , universal_newlines=True))
+    except subprocess.CalledProcessError as err:
+        print(err.output)
+        print(err.cmd)
+        print(err.returncode)
+        print(err)
+
+###################
+# File processing #
+###################
+
+def open_file_as_list():
+    """Open the file"""
+
+    # Open the command file from args.file
+    commandFile = open(args.file, 'r')
+
+    # Make a list with one entry for every line in the file
+    return list(commandFile)
+
+
+def split_commands(commandList):
+    """Splits the single commands into lists"""
+
+    for i in range(len(commandList)):
+        # In case we get problems with LC, CR, ... , a splitline could help
+        #tempList = commandList[i].splitlines()
+        #commandList[i] = tempList[0].split()
+
+        # Check for empty line
+        if commandList[i] != "\n":
+            # Split lines into lists
+            commandList[i] = commandList[i].split()
+
+        else:
+            # Replace empty line with comment sign "#"
+            logging.debug("Empty line detected.")
+            commandList[i] = ["#"]
+
+    return commandList
+
+
+######################
+# Command processing #
+######################
+
+def from_command(commandLine):
+    logging.debug("From")
+    logging.debug(commandLine)
+
+    # Check for remote repository
+    if ":" in commandLine[1] and not commandLine[1].startswith("local:"):
+        local = False
+
+        # Split the full image name into remote and image
+        remoteImageList = commandLine[1].split(":")
+        remoteName = remoteImageList[0]
+        imageName = remoteImageList[1]
+
+    else:
+        local = True
+        remoteName = ""
+        imageName = commandLine[1]
+
+    # Check if "AS" keyword is there and set container name or otherwise generate one
+    if len(commandLine) == 4 and commandLine[2] == "AS":
+
+        actualContainer = commandLine[3]
+    else:
+        # Generate container name by replacing "/" with "-" and add random int
+        actualContainer = imageName.replace("/","-") + str(random.randint(1000, 9999))
+
+    if not local:
+        # Get image from remote
+        lxd_image_copy(remoteName, imageName)
+
+    # Launch the container
+    lxd_launch(imageName, actualContainer)
+
+
+def exec_command(commandLine):
+    logging.debug("Exec")
+    logging.debug(commandLine)
+
+    # The command to be executed
+    command = ""
+
+    if len(commandLine) > 1:
+        for i in commandLine[1:]:
+            command = command + " " + i
+
+        logging.debug(command)
+
+        # Call lxd command with actual container
+        lxd_exec(actualContainer, command)
+
+
+def snapshot_command(commandLine):
+    logging.debug("Snapshot")
+    logging.debug(commandLine)
+
+    global  snapshotCounter
+    global  actualSnapshot
+
+    # Stop container
+    lxd_stop_container(actualContainer)
+
+    # Check if snapshot name is supplied or must be created
+    if  len(commandLine) == 1:
+        snapshotCounter = snapshotCounter +1
+        actualSnapshot = "s" + str(snapshotCounter)
+
+    else:
+        actualSnapshot = commandLine[1]
+
+    # Take the snapshot
+    lxd_snapshot(actualContainer, actualSnapshot)
+
+    # Start container
+    lxd_start_container(actualContainer)
+
+
+def image_command(commandLine):
+    logging.debug("Image")
+    logging.debug(commandLine)
+
+    if len(commandLine) == 2:
+        # Publish image
+        lxd_publish_image(commandLine[1], actualContainer, actualSnapshot)
+
+
+def file_command(commandLine):
+    logging.debug("File")
+    logging.debug(commandLine)
+
+    # Get root folder of the configuration
+    rootFolder = os.path.dirname(os.path.realpath(args.file))
+    logging.debug(rootFolder)
+
+    if len(commandLine) == 3:
+        # Add complete path to source and call the function
+        lxd_file_push(actualContainer, rootFolder + "/" + commandLine[1], commandLine[2])
+
+
+def do_nothing(commandLine):
+    logging.debug("Comment")
+
+
+commandDictionary = {
+    "FROM": from_command,
+    "EXEC": exec_command,
+    "SNAPSHOT": snapshot_command,
+    "IMAGE": image_command,
+    "FILE": file_command,
+    "#": do_nothing
+    }
+
+
+#############
+# Main loop #
+#############
+
+# Open file and split the commands into lists
+commandList = split_commands(open_file_as_list())
+logging.debug(commandList)
+
+# Process each command
+for i in range(len(commandList)):
+    commandDictionary[commandList[i][0]](commandList[i])
+
+    # Wait a bit to make sure everything has finished in the background
+    time.sleep(1)
+
+# Exit with success
+sys.exit()
+

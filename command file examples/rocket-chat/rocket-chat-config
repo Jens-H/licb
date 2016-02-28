@@ -1,0 +1,32 @@
+FROM images:ubuntu/wily/amd64 AS rocket-chat
+
+# Update system
+EXEC apt-get update
+EXEC apt-get upgrade -y
+
+# Install extra software via apt
+EXEC apt-get install -y npm mongodb curl graphicsmagick
+SNAPSHOT after-apt-install
+
+# Install extra software via npm
+EXEC npm install -g n
+EXEC n 0.10.40
+
+# Make intermediate image
+SNAPSHOT after-npm
+IMAGE wily/node/mongodb
+
+# Download latest rocket chat and prepare for execution
+EXEC curl -L https://rocket.chat/releases/latest/download -o rocket.chat.tgz
+EXEC tar zxvf rocket.chat.tgz
+EXEC mv bundle Rocket.Chat
+EXEC sh -c '(cd Rocket.Chat/programs/server && npm install)'
+
+# Copy systemd script and enable it
+FILE  rocket-chat.service /lib/systemd/system/
+EXEC systemctl enable rocket-chat.service
+EXEC systemctl start rocket-chat.service
+
+# Make image
+SNAPSHOT finished
+IMAGE wily/rocket.chat

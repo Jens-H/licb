@@ -1,0 +1,10 @@
+[Unit]
+Description=The rocket.chat node application
+
+[Service]
+User=root
+Environment="ROOT_URL=http://%H/" "MONGO_URL=mongodb://localhost:27017/rocketchat" "PORT=80"
+ExecStart=/usr/local/bin/node /root/Rocket.Chat/main.js
+
+[Install]
+WantedBy=multi-user.target
