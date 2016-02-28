@@ -62,3 +62,4 @@ and
 > 2.0.0.beta4
 
 ### License
+GPL version 2 or (at your option) any later version
