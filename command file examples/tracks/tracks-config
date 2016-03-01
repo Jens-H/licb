@@ -1,0 +1,39 @@
+FROM images:ubuntu/wily/amd64 AS tracks
+
+# Update system
+EXEC apt-get update
+EXEC apt-get upgrade -y
+
+# Install extra software via apt
+EXEC apt-get install -y ruby ruby-dev curl build-essential libsqlite3-dev libmysqld-dev
+SNAPSHOT after-apt-install
+
+# Install bundler
+EXEC gem install bundler
+
+# Download tracks
+EXEC curl -L https://github.com/TracksApp/tracks/archive/v2.3.0.tar.gz -o tracks.tar.gz
+EXEC tar -zxvf tracks.tar.gz
+
+# Install ruby gems
+EXEC sh -c '(cd tracks-2.3.0 && bundle install --without development test)'
+
+# Copy configuration files
+FILE site.yml /root/tracks-2.3.0/config/
+FILE database.yml /root/tracks-2.3.0/config/
+FILE production.rb /root/tracks-2.3.0/config/environments/
+
+# Prepare database
+EXEC sh -c '(cd tracks-2.3.0 && bundle exec rake db:migrate RAILS_ENV=production)'
+
+# Precompile assets
+EXEC sh -c '(cd tracks-2.3.0 && bundle exec rake assets:precompile RAILS_ENV=production)'
+
+# Copy systemd script and enable it
+FILE  tracks.service /lib/systemd/system/
+EXEC systemctl enable tracks.service
+EXEC systemctl start tracks.service
+
+# Make image
+SNAPSHOT finished
+IMAGE wily/tracks
