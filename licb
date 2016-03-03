@@ -243,6 +243,9 @@ def from_command(commandLine):
     # Launch the container
     lxd_launch(imageName, actualContainer)
 
+    # Wait a bit to make sure everything has finished in the background
+    time.sleep(1)
+
 
 def exec_command(commandLine):
     logging.debug("Exec")
@@ -339,4 +342,3 @@ for i in range(len(commandList)):
 
 # Exit with success
 sys.exit()
-
