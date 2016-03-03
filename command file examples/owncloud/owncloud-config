@@ -1,0 +1,39 @@
+FROM images:ubuntu/wily/amd64 AS owncloud8
+
+# Update system
+EXEC apt-get update
+EXEC apt-get upgrade -y
+
+# Install extra software via apt
+EXEC apt-get install -y apache2 libapache2-mod-php5 curl php5-gd php5-json php5-sqlite php5-curl php5-intl php5-mcrypt
+EXEC apt-get install -y php5-imagick php5-imap php-net-ftp php5-imagick php5-apcu redis-server php5-redis
+SNAPSHOT after-apt-install
+
+# Download owncloud
+EXEC curl https://download.owncloud.org/community/owncloud-8.2.2.tar.bz2 -o owncloud.tar.bz2
+EXEC tar -xjf owncloud.tar.bz2
+EXEC mv owncloud /var/www/html/owncloud
+SNAPSHOT after-owncloud-install
+
+# Configure owncloud
+FILE owncloud.conf /etc/apache2/sites-available/
+EXEC ln -s /etc/apache2/sites-available/owncloud.conf /etc/apache2/sites-enabled/owncloud.conf
+
+# Enable apache mods
+EXEC a2enmod rewrite headers env dir mime
+EXEC systemctl restart apache2.service
+
+# Run owncloud installation
+EXEC chown -R www-data:www-data /var/www/html/owncloud/
+EXEC sh -c '(cd /var/www/html/owncloud/  && sudo -u www-data php occ  maintenance:install --database "sqlite" --database-name "owncloud"  --database-user "root" --database-pass "a3c4b8838716" --admin-user "admin" --admin-pass "12345678")'
+FILE strong-dir-perm-script /root/
+EXEC ./strong-dir-perm-script
+
+# Set the IP in the config.php - Unfortunately this has to be done every time the IP changes
+FILE replace-IP /root/
+EXEC ./replace-IP
+EXEC systemctl restart apache2.service
+
+# Make image
+SNAPSHOT finished
+IMAGE wily/owncloud

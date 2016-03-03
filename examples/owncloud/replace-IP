@@ -1,0 +1,2 @@
+#!/bin/bash
+sed -i 's/localhost/'$(ifconfig eth0 | grep 'inet addr:' | cut -d: -f2 | awk '{ print $1}')'/g' /var/www/html/owncloud/config/config.php
