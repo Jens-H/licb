@@ -16,7 +16,7 @@
 ### Description
 -v isn't used much, so better use -d to get more information about what is going on.
 
-The execution will **NOT** stop if an error happens. This should change in the future.
+The execution will stop if an error (exit status != 0) is returned to python3 subprocess.
 
 ### Examples
 `./licb -d example-commands`  
