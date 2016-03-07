@@ -59,7 +59,7 @@ Licb was tested with
 and
 
 > $ lxc --version  
-> 2.0.0.beta4
+> 2.0.0.rc1
 
 ### License
 GPL version 2 or (at your option) any later version
