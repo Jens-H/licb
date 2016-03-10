@@ -30,12 +30,14 @@ FILE strong-dir-perm-script /root/
 EXEC ./strong-dir-perm-script
 
 # Set the IP in the config.php - Unfortunately this has to be done MANUALLY in the future every time the IP changes.
-FILE replace-IP /root/
-EXEC ./replace-IP
+FILE set-IP /root/
+EXEC ./set-IP
 
 # Add Redis as local memcache
-FILE add-Redis-cache /root/
-EXEC ./add-Redis-cache
+EXEC sudo -u www-data php /var/www/html/owncloud/occ config:system:set 'memcache.local' --value=\\OC\\Memcache\\Redis
+EXEC sudo -u www-data php /var/www/html/owncloud/occ config:system:set 'memcache.locking' --value=\\OC\\Memcache\\Redis
+EXEC sudo -u www-data php /var/www/html/owncloud/occ config:system:set redis host --value=localhost
+EXEC sudo -u www-data php /var/www/html/owncloud/occ config:system:set redis port --value=6379
 EXEC systemctl restart apache2.service
 
 # Make image
