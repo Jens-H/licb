@@ -3,9 +3,9 @@ Description=The activemq broker service
 
 [Service]
 Type=forking
-ExecStart=/root/apache-activemq-5.13.1/bin/activemq start
-ExecReload=/root/apache-activemq-5.13.1/bin/activemq reload
-ExecStop=/root/apache-activemq-5.13.1/bin/activemq stop
+ExecStart=/root/apache-activemq-5.13.2/bin/activemq start
+ExecReload=/root/apache-activemq-5.13.2/bin/activemq reload
+ExecStop=/root/apache-activemq-5.13.2/bin/activemq stop
 
 [Install]
 WantedBy=multi-user.target

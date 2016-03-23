@@ -9,11 +9,11 @@ EXEC apt-get install -y openjdk-8-jre-headless curl
 SNAPSHOT after-apt-install
 
 # Get activemq and unpack
-EXEC curl http://www.eu.apache.org/dist/activemq/5.13.1/apache-activemq-5.13.1-bin.tar.gz -o apache-activemq-5.13.1-bin.tar.gz
-EXEC tar -zxvf apache-activemq-5.13.1-bin.tar.gz
+EXEC curl http://www.eu.apache.org/dist/activemq/5.13.2/apache-activemq-5.13.2-bin.tar.gz -o apache-activemq-5.13.2-bin.tar.gz
+EXEC tar -zxvf apache-activemq-5.13.2-bin.tar.gz
 
 # Copy activemq configuration file
-FILE activemq.xml /root/apache-activemq-5.13.1/conf/
+FILE activemq.xml /root/apache-activemq-5.13.2/conf/
 
 # Copy systemd script and enable it
 FILE  activemq.service /lib/systemd/system/
