@@ -30,9 +30,10 @@ import logging
 # Parse the command line parameters and options
 parser = argparse.ArgumentParser()
 parser.add_argument("file", help="file to process")
+parser.add_argument("-s", "--snapshot", help="use snapshot as entry point")
 parser.add_argument("-v", "--verbose", help="increase output verbosity", action="store_true")
 parser.add_argument("-d", "--debug", help="enable debug output", action="store_true")
-parser.add_argument("-V", "--version", action="version", version='VERSION 0.1')
+parser.add_argument("-V", "--version", action="version", version='VERSION 0.3')
 args = parser.parse_args()
 
 
@@ -48,6 +49,9 @@ if args.debug:
 logging.basicConfig(level=logLevel, format='%(levelname)s %(message)s')
 
 # Print command line args
+if args.snapshot is not None:
+    logging.info("Snapshot as entry point used: " +args.snapshot)
+
 logging.debug("File argument: " + args.file)
 logging.debug("Verbose argument: " + str(args.verbose))
 logging.debug("Debug argument: " + str(args.debug))
@@ -62,12 +66,15 @@ actualContainer = ""
 actualSnapshot = ""
 snapshotCounter = 0
 
+# Continue with command processing
+process = True
+
 
 # Error routine
 def end_with_error(err):
     logging.error("LXC return value indicates an error: " + str(err.returncode))
     logging.error("Error output: " + err.output)
-    logging.error("Error command: " + err.cmd)
+    logging.error("Error command: " + str(err.cmd))
     logging.error("Error: " + str(err))
 
     sys.exit(1)
@@ -104,6 +111,9 @@ def lxd_launch(imageName, containerName):
     except subprocess.CalledProcessError as err:
         end_with_error(err)
 
+    # Wait a bit to make sure everything has finished in the background
+    time.sleep(5)
+
 
 def lxd_exec(containerName, command):
     """Calls the 'lxc exec --' function"""
@@ -117,7 +127,7 @@ def lxd_exec(containerName, command):
 
 def lxd_start_container(containerName):
     """Calls 'lxc start' to start a container"""
-    logging.debug("lxd start func")
+    logging.debug("lxd start function")
 
     try:
         print(subprocess.check_output(["lxc", "start", containerName], universal_newlines=True))
@@ -127,7 +137,7 @@ def lxd_start_container(containerName):
 
 def lxd_stop_container(containerName):
     """Calls 'lxc stop' to stop a container"""
-    logging.debug("lxd stop func")
+    logging.debug("lxd stop function")
 
     try:
         print(subprocess.check_output(["lxc", "stop", containerName], universal_newlines=True))
@@ -231,7 +241,6 @@ def from_command(commandLine):
 
     # Check if "AS" keyword is there and set container name or otherwise generate one
     if len(commandLine) == 4 and commandLine[2] == "AS":
-
         actualContainer = commandLine[3]
     else:
         # Generate container name by replacing "/" with "-" and add random int
@@ -326,9 +335,35 @@ commandDictionary = {
     }
 
 
+def start_from_snapshot(commandList):
+    # Set snapshot name
+    actualSnapshot = args.snapshot
+
+    # Get container name
+    if commandList[0][0] == "FROM" and len(commandList[0]) == 4:
+        actualContainer = commandList[0][3]
+    else:
+        logging.error("No container name is specified in FROM command.")
+        logging.error("Snapshot origin unknown")
+        sys.exit(1)
+
+    # Build image
+    imageName = actualSnapshot + "_auto" + str(random.randint(1000, 9999))
+
+    lxd_publish_image(imageName, actualContainer, actualSnapshot)
+
+    # Start up new container
+    actualContainer = actualContainer + "-auto" + str(random.randint(1000, 9999))
+    lxd_launch(imageName, actualContainer)
+
+
 #############
 # Main loop #
 #############
+
+# Set process to False if snapshot flag is set
+if args.snapshot is not None:
+    process = False
 
 # Open file and split the commands into lists
 commandList = split_commands(open_file_as_list())
@@ -336,10 +371,23 @@ logging.debug(commandList)
 
 # Process each command
 for i in range(len(commandList)):
-    commandDictionary[commandList[i][0]](commandList[i])
 
-    # Wait a bit to make sure everything has finished in the background
-    time.sleep(1)
+    if args.snapshot is not None and process is False:
+        # If the SNAPSHOT command and name fits, a image is made
+        # and a container started
+        if commandList[i][0] == "SNAPSHOT" and commandList[i][1] == args.snapshot:
+            start_from_snapshot(commandList)
+            process = True
+
+        continue
+
+
+    # Call the commands only if process is true
+    if process is True:
+        commandDictionary[commandList[i][0]](commandList[i])
+
+        # Wait a bit to make sure everything has finished in the background
+        time.sleep(1)
 
 # Exit with success
 sys.exit()
