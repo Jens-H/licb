@@ -1,0 +1,8 @@
+#!/bin/sh
+sed -i '/);/ i\
+\  '\''memcache.local'\'' => '\''\\OC\\Memcache\\Redis'\'',\
+\  '\''memcache.locking'\'' => '\''\\OC\\Memcache\\Redis'\'',\
+\  '\''redis'\'' => array(\
+\     '\''host'\'' => '\''localhost'\'',\
+\     '\''port'\'' => 6379,\
+\      ),' /var/www/html/nextcloud/config/config.php
