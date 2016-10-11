@@ -1,4 +1,4 @@
-FROM images:ubuntu/wily/amd64 AS rocket-chat
+FROM images:ubuntu/xenial/amd64 AS rocket-chat
 
 # Update system
 EXEC apt-get update
@@ -10,7 +10,7 @@ SNAPSHOT after-apt-install
 
 # Install extra software via npm
 EXEC npm install -g n
-EXEC n 0.10.40
+EXEC n 4.5
 
 # Make intermediate image
 SNAPSHOT after-npm
